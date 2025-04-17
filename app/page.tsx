@@ -29,6 +29,7 @@ export default function LondonTravelGuide() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [transcript, setTranscript] = useState("")
+  const bottomRef = useRef<HTMLDivElement | null>(null);
   const [response, setResponse] = useState("")
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
     { role: "assistant", content: "Hello! I'm your London travel guide. How can I help you explore London today?" },
@@ -39,6 +40,10 @@ export default function LondonTravelGuide() {
   const synthRef:any = useRef<SpeechSynthesis | null>(null)
   const utteranceRef:any = useRef<SpeechSynthesisUtterance | null>(null)
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, response]);
+  
   // Initialize speech recognition and synthesis
   useEffect(() => {
     
@@ -99,38 +104,62 @@ export default function LondonTravelGuide() {
   // Handle sending message to API
   const handleSendMessage = async (message: string) => {
     try {
-      setIsLoading(true)
-      const response = await fetch("/api/chat", {
+      setIsLoading(true);
+      setResponse(""); // reset UI output
+  
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messages: [...messages, { role: "user", content: message }],
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to get response")
+        body: JSON.stringify({ messages: [...messages, { role: "user", content: message }] }),
+      });
+  
+      if (!res.ok || !res.body) {
+        throw new Error("Failed to get response");
       }
-
-      const data = await response.json()
-      const aiResponse = data.response
-
-      setResponse(aiResponse)
-      setMessages((prev) => [...prev, { role: "assistant", content: aiResponse }])
-
-      // Speak the response
-      speakText(aiResponse)
-    } catch (error) {
-      console.error("Error:", error)
-      const errorMessage = "Sorry, I encountered an error. Please try again."
-      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage }])
-      speakText(errorMessage)
+  
+      const decoder = new TextDecoder();
+      const reader = res.body.getReader();
+  
+      let fullResponse = "";
+  
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+  
+        const chunk = decoder.decode(value, { stream: true });
+  
+        // Split on newlines for NDJSON (one JSON object per line)
+        const lines = chunk.split("\n").filter(line => line.trim() !== "");
+  
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line);
+            const content = json?.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              setResponse(prev => prev + content); // LIVE update
+            }
+          } catch (err) {
+            console.error("Streaming JSON parse error:", err, line);
+          }
+        }
+      }
+  
+      setMessages(prev => [...prev, { role: "assistant", content: fullResponse }]);
+      speakText(fullResponse);
+  
+    } catch (err) {
+      console.error("Error during stream:", err);
+      const errorMessage = "Oops! Something went wrong. Try again.";
+      setMessages(prev => [...prev, { role: "assistant", content: errorMessage }]);
+      speakText(errorMessage);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+  
 
   // Toggle listening
   const toggleListening = () => {
@@ -178,7 +207,7 @@ export default function LondonTravelGuide() {
             setIsSpeaking(false);
           }
         };
-        debugger
+        
         synthRef.current.speak(utterance);
       });
     }
@@ -215,6 +244,13 @@ export default function LondonTravelGuide() {
                 {msg.content}
               </div>
             ))}
+
+            {/* {response && (
+              <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto text-black">
+                {response}
+              </div>
+            )} */}
+            
             {isLoading && (
               <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto">
                 <div className="flex space-x-2">
@@ -233,6 +269,7 @@ export default function LondonTravelGuide() {
                 </div>
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
         </CardContent>
       </Card>

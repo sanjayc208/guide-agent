@@ -1,8 +1,6 @@
-import { generateText } from "ai"
-import { google } from "@ai-sdk/google"
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
-// London travel guide system prompt
 const SYSTEM_PROMPT = `You are an expert London travel guide named "London Guide". You have extensive knowledge about London, UK, including its history, landmarks, culture, transportation, food, and local tips.
 
 GUIDELINES:
@@ -30,38 +28,80 @@ KNOWLEDGE AREAS:
 - Practical travel tips (weather, etiquette, safety, money)
 - Hidden gems and local favorites
 
-Remember to be conversational, informative, and enthusiastic about helping users discover London!`
+Remember to be conversational, informative, and enthusiastic about helping users discover London!`;
+
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPEN_ROUTER_API_KEY,
+  defaultHeaders: {
+    "HTTP-Referer": "<YOUR_SITE_URL>",
+    "X-Title": "<YOUR_SITE_NAME>",
+  },
+});
 
 export async function POST(req: Request) {
+  const { readable, writable } = new TransformStream();
+
   try {
-    const { messages } = await req.json()
+    const { messages } = await req.json();
 
-    // Extract the user's message
-    const userMessages = messages
-      .filter((msg: any) => msg.role === "user")
-      .map((msg: any) => msg.content)
-      .join("\n")
+    const prompt = `Provide a helpful response as the London travel guide based on the following conversation:\n${messages.map((msg: any) => `${msg.role}: ${msg.content}`).join("\n")}`;
 
-    // Get the last few messages for context (limit to 5 for efficiency)
-    const recentMessages = messages.slice(-5)
-    const conversationContext = recentMessages
-      .map((msg: any) => `${msg.role === "user" ? "User" : "Guide"}: ${msg.content}`)
-      .join("\n")
+    const aiStream: any = await openai.chat.completions.create({
+      model: "meta-llama/llama-3.2-1b-instruct:free",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      stream: true,
+    });
 
-    // Combine the conversation context with the user's query
-    const prompt = `Previous conversation:\n${conversationContext}\n\nUser's latest query: ${messages[messages.length - 1].content}\n\nProvide a helpful response as the London travel guide.`
+    
+    const encoder = new TextEncoder();
 
-    // Generate response using Gemini
-    const { text } = await generateText({
-      model: google("gemini-1.5-pro-latest"),
-      prompt: prompt,
-      system: SYSTEM_PROMPT,
-      maxTokens: 500,
-    })
-    console.log('text-->',text)
-    return NextResponse.json({ response: text })
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of aiStream) {
+            const content = chunk?.choices?.[0]?.delta?.content;
+            if (content) {
+              const json = JSON.stringify({
+                choices: [{
+                  delta: { content },
+                }]
+              });
+              controller.enqueue(encoder.encode(json + '\n'));
+            }
+          }
+
+          controller.enqueue(encoder.encode(JSON.stringify({ done: true }) + '\n'));
+          controller.close();
+        } catch (err) {
+          controller.error(err);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Transfer-Encoding': 'chunked',
+      },
+    });
+
   } catch (error) {
-    console.error("Error in chat API:", error)
-    return NextResponse.json({ error: "Failed to process your request" }, { status: 500 })
+    console.error("Error in streaming response:", error);
+    // Ensure the writable stream is not locked before attempting to get a writer
+    if (!writable.locked) {
+      const writer = writable.getWriter();
+      await writer.write("Error: Unable to process the request.");
+      writer.close();
+    } else {
+      console.error("Writable stream is locked and cannot be written to.");
+    }
   }
+
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain" },
+  });
 }
