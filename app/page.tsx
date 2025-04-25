@@ -3,8 +3,18 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Mic, MicOff, Volume2, VolumeX } from "lucide-react"
+import { Mic, MicOff, Volume2, VolumeX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
+import dynamic from "next/dynamic"
+import {toast} from "react-fox-toast"
+
+// Dynamically import the Map component with no SSR
+const MapComponent = dynamic(() => import("@/components/map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[300px] bg-gray-100 rounded-lg flex items-center justify-center">Loading map...</div>
+  ),
+})
 
 // Declare SpeechRecognition
 declare global {
@@ -29,24 +39,34 @@ export default function LondonTravelGuide() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [transcript, setTranscript] = useState("")
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null)
   const [response, setResponse] = useState("")
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: "Hello! I'm your London travel guide. How can I help you explore London today?" },
+    { role: "assistant", content: "Hello! I'm your travel guide. How can I help you explore places today?" },
   ])
   const [isLoading, setIsLoading] = useState(false)
+  const [location, setLocation] = useState<any>(null)
 
-  const recognitionRef: any = useRef<typeof SpeechRecognition | null>(null)
-  const synthRef:any = useRef<SpeechSynthesis | null>(null)
-  const utteranceRef:any = useRef<SpeechSynthesisUtterance | null>(null)
+  const recognitionRef: any = useRef<SpeechRecognition | null>(null)
+  const synthRef: any = useRef<SpeechSynthesis | null>(null)
+  const utteranceRef: any = useRef<SpeechSynthesisUtterance | null>(null)
+
+  // Add a ref to store the latest location
+  const locationRef = useRef<any>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, response]);
-  
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, response])
+
+  useEffect(() => {
+    if (location) {
+      locationRef.current = location
+      console.log(`Location updated: ${location.city}, ${location.state}, ${location.country}`)
+    }
+  }, [location])
+
   // Initialize speech recognition and synthesis
   useEffect(() => {
-    
     if (typeof window !== "undefined") {
       // Speech Recognition setup
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -56,9 +76,9 @@ export default function LondonTravelGuide() {
         recognitionRef.current.interimResults = false
         recognitionRef.current.lang = "en-US"
 
-        let pauseTimeout:any;
+        let pauseTimeout: any
 
-        recognitionRef.current.onresult = (event:any) => {
+        recognitionRef.current.onresult = (event: any) => {
           const userTranscript = event.results[0][0].transcript
           console.log("Interim result:", userTranscript) // Log interim result
           setTranscript(userTranscript)
@@ -70,7 +90,7 @@ export default function LondonTravelGuide() {
           pauseTimeout = setTimeout(() => {
             console.log("Final result:", userTranscript) // Log final result
             setMessages((prev) => [...prev, { role: "user", content: userTranscript }])
-            handleSendMessage(userTranscript)
+            handleSendMessage(userTranscript, locationRef.current) // Use locationRef.current
             recognitionRef.current?.stop() // Stop listening until toggled again
             setIsListening(false)
           }, 900)
@@ -102,64 +122,69 @@ export default function LondonTravelGuide() {
   }, [])
 
   // Handle sending message to API
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, location: any) => {
     try {
-      setIsLoading(true);
-      setResponse(""); // reset UI output
-  
+      setIsLoading(true)
+      setResponse("") // reset UI output
+      
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: [...messages, { role: "user", content: message }] }),
-      });
-  
+        body: JSON.stringify({ messages: [...messages, { role: "user", content: message }], location: location }),
+      })
+
       if (!res.ok || !res.body) {
-        throw new Error("Failed to get response");
+        throw new Error("Failed to get response")
       }
-  
-      const decoder = new TextDecoder();
-      const reader = res.body.getReader();
-  
-      let fullResponse = "";
-  
+
+      const decoder = new TextDecoder()
+      const reader = res.body.getReader()
+
+      let fullResponse = ""
+
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-  
-        const chunk = decoder.decode(value, { stream: true });
-  
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+
         // Split on newlines for NDJSON (one JSON object per line)
-        const lines = chunk.split("\n").filter(line => line.trim() !== "");
-  
+        const lines = chunk.split("\n").filter((line) => line.trim() !== "")
+
         for (const line of lines) {
           try {
-            const json = JSON.parse(line);
-            const content = json?.choices?.[0]?.delta?.content;
+            const json = JSON.parse(line)
+            const content = json?.choices?.[0]?.delta?.content
             if (content) {
-              fullResponse += content;
-              setResponse(prev => prev + content); // LIVE update
+              fullResponse += content
+              setResponse((prev) => prev + content) // LIVE update
             }
           } catch (err) {
-            console.error("Streaming JSON parse error:", err, line);
+            console.error("Streaming JSON parse error:", err, line)
           }
         }
       }
-  
-      setMessages(prev => [...prev, { role: "assistant", content: fullResponse }]);
-      speakText(fullResponse);
-  
+
+      setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }])
+      speakText(fullResponse)
     } catch (err) {
-      console.error("Error during stream:", err);
-      const errorMessage = "Oops! Something went wrong. Try again.";
-      setMessages(prev => [...prev, { role: "assistant", content: errorMessage }]);
-      speakText(errorMessage);
+      console.error("Error during stream:", err)
+      const errorMessage = "Oops! Something went wrong. Try again."
+      setMessages((prev) => [...prev, { role: "assistant", content: errorMessage }])
+      speakText(errorMessage)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
-  
+  }
+
+  // Handle location change
+  const handleLocationChange = (locationData: { city: string; state: string; country: string }) => {
+    setLocation({city: locationData.city, state: locationData.state, country: locationData.country})
+
+    console.log(`Location on handleLocation Change: ${locationData.city}, ${locationData.state}, ${locationData.country}`)
+  }
 
   // Toggle listening
   const toggleListening = () => {
@@ -184,32 +209,34 @@ export default function LondonTravelGuide() {
   // Break text into sentences and add a small pause between each sentence
   const speakText = (text: string) => {
     if (synthRef.current) {
-      const sentences = text.split(/(?<=[.!?])\s+/); // Split text into sentences
+      const sentences = text.split(/(?<=[.!?])\s+/) // Split text into sentences
       sentences.forEach((sentence, index) => {
-        const utterance = new SpeechSynthesisUtterance(sentence);
-        utterance.rate = 1; // Normal speech rate
-        utterance.pitch = 1; // Normal pitch
-        utterance.volume = 1; // Full volume
+        const utterance = new SpeechSynthesisUtterance(sentence)
+        utterance.rate = 1 // Normal speech rate
+        utterance.pitch = 1 // Normal pitch
+        utterance.volume = 1 // Full volume
 
         // Select a UK English voice
-        const voices = synthRef.current?.getVoices() || [];
-        const ukVoice = voices.find((voice:any) => voice.lang === "en-GB" && voice.voiceURI === 'Google UK English Female');
+        const voices = synthRef.current?.getVoices() || []
+        const ukVoice = voices.find(
+          (voice: any) => voice.lang === "en-GB" && voice.voiceURI === "Google UK English Female",
+        )
         if (ukVoice) {
-          utterance.voice = ukVoice;
+          utterance.voice = ukVoice
         }
 
         utterance.onstart = () => {
-          setIsSpeaking(true);
-        };
+          setIsSpeaking(true)
+        }
 
         utterance.onend = () => {
           if (index === sentences.length - 1) {
-            setIsSpeaking(false);
+            setIsSpeaking(false)
           }
-        };
-        
-        synthRef.current.speak(utterance);
-      });
+        }
+
+        synthRef.current.speak(utterance)
+      })
     }
   }
 
@@ -224,13 +251,30 @@ export default function LondonTravelGuide() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 flex flex-col items-center p-4">
-      <header className="w-full max-w-md text-center mb-6">
-        <h1 className="text-3xl font-bold text-blue-800 mb-2">London Travel Guide</h1>
-        <p className="text-gray-600">Ask me anything about London!</p>
+    <div className="min-h-screen bg-gradient-to-b from-yellow-50 to-orange-100 flex flex-col items-center p-4">
+      <header className="w-full max-w-2xl text-center mb-6">
+        <h1 className="text-3xl font-bold text-primary mb-2">Travel Guide</h1>
+        <p className="text-gray-600">Ask me anything about {location?.city}!</p>
       </header>
 
-      <Card className="w-full max-w-md mb-6 bg-white shadow-lg">
+      {/* Map Component */}
+      <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
+        <CardContent className="p-4">
+          <div className="h-[300px] rounded-lg overflow-hidden">
+            <MapComponent onLocationChange={handleLocationChange} />
+          </div>
+          {location && (
+            <div className="mt-2 text-sm flex items-center text-gray-600">
+              <MapPin className="w-4 h-4 mr-1" />
+              <span>
+                {location.city}, {location.state}, {location.country}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
         <CardContent className="p-4">
           <div className="space-y-4 max-h-[50vh] overflow-y-auto">
             {messages.map((msg, index) => (
@@ -245,12 +289,6 @@ export default function LondonTravelGuide() {
               </div>
             ))}
 
-            {/* {response && (
-              <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto text-black">
-                {response}
-              </div>
-            )} */}
-            
             {isLoading && (
               <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto">
                 <div className="flex space-x-2">
@@ -274,12 +312,12 @@ export default function LondonTravelGuide() {
         </CardContent>
       </Card>
 
-      <div className="w-full max-w-md flex justify-center space-x-4">
+      <div className="w-full max-w-2xl flex justify-center space-x-4">
         <Button
           onClick={toggleListening}
           className={cn(
             "rounded-full w-16 h-16 flex items-center justify-center",
-            isListening ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600",
+            isListening ? "bg-red-500 hover:bg-red-600" : "bg-primary",
           )}
           disabled={isLoading}
         >
@@ -290,7 +328,7 @@ export default function LondonTravelGuide() {
           onClick={toggleSpeech}
           className={cn(
             "rounded-full w-16 h-16 flex items-center justify-center",
-            isSpeaking ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600",
+            isSpeaking ? "bg-red-500 hover:bg-red-600" : "bg-primary",
           )}
           disabled={!response || isLoading}
         >

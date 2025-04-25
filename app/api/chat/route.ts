@@ -43,20 +43,53 @@ export async function POST(req: Request) {
   const { readable, writable } = new TransformStream();
 
   try {
-    const { messages } = await req.json();
+    const { messages, location } = await req.json(); // Accept location from the request body
 
-    const prompt = `Provide a helpful response as the London travel guide based on the following conversation:\n${messages.map((msg: any) => `${msg.role}: ${msg.content}`).join("\n")}`;
+    // Use the provided location or default to "London"
+    const userLocation = location?.city || "London";
+
+    const dynamicSystemPrompt = `You are an expert travel guide named "Travel Guide". You have extensive knowledge about ${userLocation}, including its history, landmarks, culture, transportation, food, and local tips.
+
+GUIDELINES:
+1. Provide accurate, helpful, and engaging information about ${userLocation}.
+2. Keep responses conversational and friendly, as if speaking to a tourist.
+3. Offer specific recommendations when asked about attractions, restaurants, or activities.
+4. Include practical information like opening hours, ticket prices, or transportation options when relevant.
+5. Share interesting historical facts and cultural context to enrich the user's understanding.
+6. If asked about something outside of ${userLocation}, politely redirect to ${userLocation}-related information.
+7. Keep responses concise and suitable for voice conversation (around 2-3 sentences for simple questions, 4-5 for complex ones).
+8. Avoid lengthy lists that would be difficult to follow in speech.
+9. If you don't know specific current information (like today's events), acknowledge this limitation.
+10. Personalize responses based on user preferences when provided.
+
+KNOWLEDGE AREAS:
+- Famous landmarks
+- Museums and galleries
+- Parks and gardens
+- Entertainment
+- Shopping areas
+- Restaurants and pubs
+- Transportation
+- Day trips from ${userLocation}
+- Seasonal events and festivals
+- Practical travel tips (weather, etiquette, safety, money)
+- Hidden gems and local favorites
+
+Remember to be conversational, informative, and enthusiastic about helping users discover ${userLocation}!`;
+
+    const prompt = `Provide a helpful response as the travel guide based on the following conversation:\n${messages
+      .map((msg: any) => `${msg.role}: ${msg.content}`)
+      .join("\n")}`;
 
     const aiStream: any = await openai.chat.completions.create({
       model: "meta-llama/llama-3.2-1b-instruct:free",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: dynamicSystemPrompt },
         { role: "user", content: prompt },
       ],
       stream: true,
     });
 
-    
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -66,32 +99,32 @@ export async function POST(req: Request) {
             const content = chunk?.choices?.[0]?.delta?.content;
             if (content) {
               const json = JSON.stringify({
-                choices: [{
-                  delta: { content },
-                }]
+                choices: [
+                  {
+                    delta: { content },
+                  },
+                ],
               });
-              controller.enqueue(encoder.encode(json + '\n'));
+              controller.enqueue(encoder.encode(json + "\n"));
             }
           }
 
-          controller.enqueue(encoder.encode(JSON.stringify({ done: true }) + '\n'));
+          controller.enqueue(encoder.encode(JSON.stringify({ done: true }) + "\n"));
           controller.close();
         } catch (err) {
           controller.error(err);
         }
-      }
+      },
     });
 
     return new Response(stream, {
       headers: {
-        'Content-Type': 'application/json',
-        'Transfer-Encoding': 'chunked',
+        "Content-Type": "application/json",
+        "Transfer-Encoding": "chunked",
       },
     });
-
   } catch (error) {
     console.error("Error in streaming response:", error);
-    // Ensure the writable stream is not locked before attempting to get a writer
     if (!writable.locked) {
       const writer = writable.getWriter();
       await writer.write("Error: Unable to process the request.");
