@@ -251,7 +251,7 @@ export default function LondonTravelGuide() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-yellow-50 to-orange-100 flex flex-col items-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-blue-200 to-red-200 flex flex-col items-center p-4">
       <header className="w-full max-w-2xl text-center mb-6">
         <h1 className="text-3xl font-bold text-primary mb-2">Travel Guide</h1>
         <p className="text-gray-600">Ask me anything about {location?.city}!</p>
