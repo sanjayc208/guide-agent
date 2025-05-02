@@ -40,6 +40,7 @@ export default function LondonTravelGuide() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [transcript, setTranscript] = useState("")
+  const [poi, setPoi] = useState([])
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const [response, setResponse] = useState("")
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
@@ -149,7 +150,6 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
       if (!res.ok || !res.body) {
         throw new Error("Failed to get response")
       }
-      debugger
 
       // const decoder = new TextDecoder()
       // const reader = res.body.getReader()
@@ -182,6 +182,7 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
       // setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }])
 
       const responseText = await res.json();
+      setPoi(responseText.poi)
       setMessages((prev) => [...prev, { role: "assistant", content: responseText.content }])
       speakText(responseText.content)
     } catch (err) {
@@ -294,7 +295,7 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
       <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
         <CardContent className="p-4">
           <div className="h-[300px] rounded-lg overflow-hidden">
-            <MapComponent onLocationChange={handleLocationChange} radius={Number(radius)} />
+            <MapComponent onLocationChange={handleLocationChange} radius={Number(radius)} poi={poi}/>
           </div>
           {location && (
             <div className="mt-2 text-sm flex items-center text-gray-600">

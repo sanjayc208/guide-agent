@@ -130,6 +130,7 @@ ${JSON.stringify(filtered, null, 2)}
             return NextResponse.json({
                 role: "assistant",
                 content: final.choices[0]?.message?.content ?? 'No content available',
+                poi: filtered,
             }, { status: 200 });
 
             // Stream back to client

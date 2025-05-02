@@ -18,14 +18,42 @@ const fixLeafletIcon = () => {
 
 interface MapComponentProps {
   onLocationChange: (location: { city: string; state: string; country: string, lat: string, lon:string }) => void
-  radius?: number
+  radius?: number;
+  poi?: any
 }
 
-export default function MapComponent({ onLocationChange, radius = 1000 }: MapComponentProps) {
+export default function MapComponent({ onLocationChange, radius = 1000, poi=[] }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null)
   const circleRef = useRef<L.Circle | null>(null); // Ref to store the circle instance
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const markersRef = useRef<L.Marker[]>([]); // Ref to store marker instances
+
+  useEffect(() => {
+      // Remove existing markers
+      markersRef.current.forEach(marker => {
+        mapRef.current?.removeLayer(marker);
+      });
+      markersRef.current = [];
+
+      // Add new markers for each POI with red icon
+      poi.forEach((p: any) => {
+        if(!p.name || !p.category) return; // Skip if name or category is missing
+        const redIcon = L.icon({
+          iconUrl: 'https://www.svgrepo.com/show/476893/marker.svg',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+          shadowSize: [41, 41]
+        });
+
+        const marker = L.marker([p.lat, p.lon], { icon: redIcon }).addTo(mapRef.current!);
+        marker.bindPopup(`<b>${p.name}</b><br>${p.category}`).openPopup();
+        markersRef.current.push(marker);
+      });
+  }, [poi]);
 
   useEffect(() => {
     // Fix Leaflet icon issues
