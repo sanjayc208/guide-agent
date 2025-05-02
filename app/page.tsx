@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Mic, MicOff, Volume2, VolumeX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import dynamic from "next/dynamic"
-import {toast} from "react-fox-toast"
+import { toast } from "react-fox-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Dynamically import the Map component with no SSR
 const MapComponent = dynamic(() => import("@/components/map"), {
@@ -42,10 +43,12 @@ export default function LondonTravelGuide() {
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const [response, setResponse] = useState("")
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: "Hello! I'm your travel guide. How can I help you explore places today?" },
+    { role: "assistant", content: `Hey there! 👋 I'm your friendly AI Agent, ready to explore the neighborhood with you! ☕🍔🏥
+Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask, and I’ll find the best spots within 1 km of where you are. Let’s discover what’s around you! 🌍✨` },
   ])
   const [isLoading, setIsLoading] = useState(false)
   const [location, setLocation] = useState<any>(null)
+  const [radius, setRadius] = useState(1000) // Default radius is 1000m
 
   const recognitionRef: any = useRef<SpeechRecognition | null>(null)
   const synthRef: any = useRef<SpeechSynthesis | null>(null)
@@ -53,6 +56,10 @@ export default function LondonTravelGuide() {
 
   // Add a ref to store the latest location
   const locationRef = useRef<any>(null)
+  const radiusRef = useRef<any>(null)
+
+  // Add a ref to store the latest location
+  const latLong = useRef<any>({ lat: 0, lng: 0 })
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -63,7 +70,11 @@ export default function LondonTravelGuide() {
       locationRef.current = location
       console.log(`Location updated: ${location.city}, ${location.state}, ${location.country}`)
     }
-  }, [location])
+    if (radius) {
+      radiusRef.current = radius
+      console.log(`Radius updated: ${radius}m`)
+    }
+  }, [location,radius])
 
   // Initialize speech recognition and synthesis
   useEffect(() => {
@@ -90,7 +101,7 @@ export default function LondonTravelGuide() {
           pauseTimeout = setTimeout(() => {
             console.log("Final result:", userTranscript) // Log final result
             setMessages((prev) => [...prev, { role: "user", content: userTranscript }])
-            handleSendMessage(userTranscript, locationRef.current) // Use locationRef.current
+            handleSendMessage(userTranscript, locationRef.current, radiusRef.current) // Use locationRef.current
             recognitionRef.current?.stop() // Stop listening until toggled again
             setIsListening(false)
           }, 900)
@@ -122,53 +133,57 @@ export default function LondonTravelGuide() {
   }, [])
 
   // Handle sending message to API
-  const handleSendMessage = async (message: string, location: any) => {
+  const handleSendMessage = async (message: string, location: any, radius:any) => {
     try {
       setIsLoading(true)
       setResponse("") // reset UI output
-      
-      const res = await fetch("/api/chat", {
+
+      const res = await fetch("/api/chat2", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: [...messages, { role: "user", content: message }], location: location }),
+        body: JSON.stringify({ messages: [...messages, { role: "user", content: message }], location: location, radius: radius }),
       })
 
       if (!res.ok || !res.body) {
         throw new Error("Failed to get response")
       }
+      debugger
 
-      const decoder = new TextDecoder()
-      const reader = res.body.getReader()
+      // const decoder = new TextDecoder()
+      // const reader = res.body.getReader()
 
-      let fullResponse = ""
+      // let fullResponse = ""
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      // while (true) {
+      //   const { done, value } = await reader.read()
+      //   if (done) break
 
-        const chunk = decoder.decode(value, { stream: true })
+      //   const chunk = decoder.decode(value, { stream: true })
 
-        // Split on newlines for NDJSON (one JSON object per line)
-        const lines = chunk.split("\n").filter((line) => line.trim() !== "")
+      //   // Split on newlines for NDJSON (one JSON object per line)
+      //   const lines = chunk.split("\n").filter((line) => line.trim() !== "")
 
-        for (const line of lines) {
-          try {
-            const json = JSON.parse(line)
-            const content = json?.choices?.[0]?.delta?.content
-            if (content) {
-              fullResponse += content
-              setResponse((prev) => prev + content) // LIVE update
-            }
-          } catch (err) {
-            console.error("Streaming JSON parse error:", err, line)
-          }
-        }
-      }
+      //   for (const line of lines) {
+      //     try {
+      //       const json = JSON.parse(line)
+      //       const content = json?.choices?.[0]?.delta?.content
+      //       if (content) {
+      //         fullResponse += content
+      //         setResponse((prev) => prev + content) // LIVE update
+      //       }
+      //     } catch (err) {
+      //       console.error("Streaming JSON parse error:", err, line)
+      //     }
+      //   }
+      // }
 
-      setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }])
-      speakText(fullResponse)
+      // setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }])
+
+      const responseText = await res.json();
+      setMessages((prev) => [...prev, { role: "assistant", content: responseText.content }])
+      speakText(responseText.content)
     } catch (err) {
       console.error("Error during stream:", err)
       const errorMessage = "Oops! Something went wrong. Try again."
@@ -180,8 +195,8 @@ export default function LondonTravelGuide() {
   }
 
   // Handle location change
-  const handleLocationChange = (locationData: { city: string; state: string; country: string }) => {
-    setLocation({city: locationData.city, state: locationData.state, country: locationData.country})
+  const handleLocationChange = (locationData: { city: string; state: string; country: string, lat: string, lon: string }) => {
+    setLocation({ city: locationData.city, state: locationData.state, country: locationData.country, lat: locationData.lat, lon: locationData.lon })
 
     console.log(`Location on handleLocation Change: ${locationData.city}, ${locationData.state}, ${locationData.country}`)
   }
@@ -254,14 +269,32 @@ export default function LondonTravelGuide() {
     <div className="min-h-screen bg-gradient-to-b from-blue-200 to-red-200 flex flex-col items-center p-4">
       <header className="w-full max-w-2xl text-center mb-6">
         <h1 className="text-3xl font-bold text-primary mb-2">Travel Guide</h1>
-        <p className="text-gray-600">Ask me anything about {location?.city}!</p>
+        <p className="text-gray-600">I can help you find places within a {radius}m radius</p>
       </header>
+
+      {/* Dropdown for radius selection */}
+      <div className="mb-4">
+        <Select value={radius.toString()} onValueChange={(value) => setRadius(Number(value))}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Select Radius" />
+          </SelectTrigger>
+          <SelectContent className="absolute z-[500]">
+            <SelectItem value="100">100m</SelectItem>
+            <SelectItem value="200">200m</SelectItem>
+            <SelectItem value="500">500m</SelectItem>
+            <SelectItem value="1000">1Km</SelectItem>
+            <SelectItem value="2000">2Km</SelectItem>
+            <SelectItem value="3000">3Km</SelectItem>
+            <SelectItem value="5000">5Km</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Map Component */}
       <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
         <CardContent className="p-4">
           <div className="h-[300px] rounded-lg overflow-hidden">
-            <MapComponent onLocationChange={handleLocationChange} />
+            <MapComponent onLocationChange={handleLocationChange} radius={Number(radius)} />
           </div>
           {location && (
             <div className="mt-2 text-sm flex items-center text-gray-600">

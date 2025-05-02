@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { use, useEffect, useRef, useState } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { toast } from "react-fox-toast"
@@ -17,73 +17,79 @@ const fixLeafletIcon = () => {
 }
 
 interface MapComponentProps {
-  onLocationChange: (location: { city: string; state: string; country: string }) => void
+  onLocationChange: (location: { city: string; state: string; country: string, lat: string, lon:string }) => void
+  radius?: number
 }
 
-export default function MapComponent({ onLocationChange }: MapComponentProps) {
+export default function MapComponent({ onLocationChange, radius = 1000 }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null)
+  const circleRef = useRef<L.Circle | null>(null); // Ref to store the circle instance
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Fix Leaflet icon issues
     fixLeafletIcon()
-
-    // Initialize map
+    
+    // Initialize map and circle
     if (!mapRef.current) {
-      const map = L.map("map").setView([51.505, -0.09], 13) // Default to London and 13 is the zoom level
-
+      const map = L.map("map").setView([51.505, -0.09], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
-      }).addTo(map)
+      }).addTo(map);
 
-      mapRef.current = map
+      mapRef.current = map;
 
-      // Get user's current location
       if (navigator.geolocation) {
         setIsLoading(true)
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            
-            const { latitude, longitude }  = position?.coords
+            const { latitude, longitude } = position.coords;
             map.setView([latitude, longitude], 13);
-            
-            // Add marker at user's location
-            const marker = L.marker([latitude, longitude], {
-              draggable: true, // Make marker draggable
-            }).addTo(map)
+
+            const marker = L.marker([latitude, longitude], { draggable: true }).addTo(map);
+
+            // Create and store the circle instance
+            circleRef.current = L.circle([latitude, longitude], { radius }).addTo(map);
 
             // Get location info for initial position
             getLocationInfo(latitude, longitude, onLocationChange)
 
-            // Handle marker drag events
             marker.on("dragend", async (e) => {
-              const marker = e.target
-              const position = marker.getLatLng()
-              
-              const toastId = toast(`Updating Location ...`, {position:'top-center'})
-              const location:any = await getLocationInfo(position.lat, position.lng, onLocationChange)
+              const position = e.target.getLatLng();
+              if (circleRef.current) {
+                circleRef.current.setLatLng(position);
+              }
+
+              const toastId = toast(`Updating Location ...`, { position: 'top-center' });
+              const location: any = await getLocationInfo(position.lat, position.lng, onLocationChange);
+
               toast.update(toastId, {
                 message: `Location Updated to ${location.city}, ${location.state}, ${location.country}`,
                 icon: <Map />,
-                position:'top-center'
+                position: 'top-center',
               });
-            })
+            });
 
             // Handle map click events to move marker
             map.on("click", async (e) => {
-              marker.setLatLng(e.latlng)
+              marker.setLatLng(e.latlng);
 
-              const toastId = toast(`Updating Location ...`, {position:'top-center'})
-              
-              const location:any = await getLocationInfo(e.latlng.lat, e.latlng.lng, onLocationChange)
+              if (circleRef.current) {
+                circleRef.current.setLatLng(e.latlng);
+              }
+
+              const toastId = toast(`Updating Location ...`, { position: 'top-center' });
+
+              const location: any = await getLocationInfo(e.latlng.lat, e.latlng.lng, onLocationChange);
+
               toast.update(toastId, {
                 message: `Location Updated to ${location.city}, ${location.state}, ${location.country}`,
                 icon: <Map />,
-                position:'top-center'
+                position: 'top-center',
               });
-            })
+            });
 
             setIsLoading(false)
           },
@@ -109,20 +115,20 @@ export default function MapComponent({ onLocationChange }: MapComponentProps) {
         getLocationInfo(51.505, -0.09, onLocationChange)
       }
     }
-
-    // return () => {
-    //   if (mapRef.current) {
-    //     mapRef.current.remove()
-    //     mapRef.current = null
-    //   }
-    // }
   }, [onLocationChange])
+
+  useEffect(() => {
+    // Update the circle radius when the radius state changes
+    if (mapRef.current && circleRef.current) {
+      circleRef.current.setRadius(radius);
+    }
+  }, [radius]);
 
   // Function to get location information from coordinates
   const getLocationInfo = async (
     lat: number,
     lng: number,
-    callback: (location: { city: string; state: string; country: string }) => void,
+    callback: (location: { city: string; state: string; country: string, lat: string, lon:string }) => void,
   ) => {
     try {
       const response = await fetch(
@@ -135,12 +141,12 @@ export default function MapComponent({ onLocationChange }: MapComponentProps) {
       const country = data.address.country || "Unknown"
 
       console.log(`Location: ${city}, ${state}, ${country}`)
-      callback({ city, state, country })
-      return { city, state, country }
+      callback({ city, state, country, lat: lat.toString(), lon: lng.toString()  })
+      return { city, state, country, lat: lat.toString(), lon: lng.toString()  }
     } catch (error) {
       console.error("Error getting location info:", error)
-      callback({ city: "Unknown", state: "Unknown", country: "Unknown" })
-      return { city: "Unknown", state: "Unknown", country: "Unknown" }
+      callback({ city: "Unknown", state: "Unknown", country: "Unknown" , lat: lat.toString(), lon: lng.toString() })
+      return { city: "Unknown", state: "Unknown", country: "Unknown", lat: lat.toString(), lon: lng.toString() }  
     }
   }
 
