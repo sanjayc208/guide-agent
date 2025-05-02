@@ -99,9 +99,10 @@ Rules:
         // If the model invoked our tool
         if (toolCall?.function.name === 'getNearbyPOIs') {
             const args = JSON.parse(toolCall.function.arguments || '{}');
-            const pois: POI[] = await fetchNearbyPOIs(lat, lon, radius);
-            const filtered = pois.filter(p => p.category === args.category).slice(0, 10);
-            console.log('Filtered POIs:', filtered);
+            const filtered: POI[] = await fetchNearbyPOIs(lat, lon, radius, args.category);
+            console.log('Fetched POIs:', filtered);
+            // const filtered = pois.filter(p => p.category === args.category).slice(0, 10);
+            // console.log('Filtered POIs:', filtered);
 
             const systemPromptRes = `
 You are a friendly AI Agent that recommends ${args.category}places nearby.

@@ -10,20 +10,20 @@ export type POI = {
 export async function fetchNearbyPOIs(
     lat: string,
     lon: string,
-    radius = 1000
+    radius = 1000,
+    category?: string
 ): Promise<POI[]> {
-    console.log("Fetching nearby POIs for:", lat, lon, radius);
+    console.log("Fetching nearby POIs for:", lat, lon, radius, category);
     const overpassUrl = "https://overpass-api.de/api/interpreter";
     const q = `
       [out:json][timeout:25];
       (
-        node(around:${radius},${lat},${lon})[amenity];
-        node(around:${radius},${lat},${lon})[tourism];
-        node(around:${radius},${lat},${lon})[leisure];
-        node(around:${radius},${lat},${lon})[shop];
+        node(around:${radius},${lat},${lon})[amenity=${category}];
       );
       out body;
     `;
+
+    console.log("Overpass query:", q);
     
     const resp = await fetch(overpassUrl, {
         method: "POST",
