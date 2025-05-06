@@ -41,20 +41,20 @@ Rules:
 4. NEVER make up place names or details. ONLY suggest real POIs returned by the tool.
 5. Keep your tone friendly, concise, and helpful.
 `;
-//         const systemPrompt = `
-// You are a travel assistant for ${userLoc}.
+        //         const systemPrompt = `
+        // You are a travel assistant for ${userLoc}.
 
-// Your job is to help users find nearby places like restaurants, cafes, parks, etc.
+        // Your job is to help users find nearby places like restaurants, cafes, parks, etc.
 
-// Rules:
-// 1. ONLY call the "getNearbyPOIs" tool if the user explicitly asks for a type of place (e.g., "restaurants", "cafes", "parks", etc.)
-// 2. DO NOT call the tool if the user asks general questions like "what can you do", "how can you help me", or greetings like "hi".
-// 3. In those general cases, just reply politely and briefly, saying you can help find places nearby.
+        // Rules:
+        // 1. ONLY call the "getNearbyPOIs" tool if the user explicitly asks for a type of place (e.g., "restaurants", "cafes", "parks", etc.)
+        // 2. DO NOT call the tool if the user asks general questions like "what can you do", "how can you help me", or greetings like "hi".
+        // 3. In those general cases, just reply politely and briefly, saying you can help find places nearby.
 
-// NEVER make up place names.
-// NEVER suggest places unless you get the real data from the tool.
-// Keep your tone friendly and helpful.
-// Respond concisely.`;
+        // NEVER make up place names.
+        // NEVER suggest places unless you get the real data from the tool.
+        // Keep your tone friendly and helpful.
+        // Respond concisely.`;
         console.log('User location:', userLoc);
         // First request: let model choose if it needs POIs via tool
         const initial = await openai.chat.completions.create({
@@ -101,11 +101,13 @@ Rules:
             const args = JSON.parse(toolCall.function.arguments || '{}');
             let filtered: POI[] = await fetchNearbyPOIs(lat, lon, radius, args.category);
             const seen = new Set();
+
+            //For demo purpose, filter out POIs with empty names
             filtered = filtered.filter(item => {
-            const name = item.name?.trim();
-            if (!name || seen.has(name)) return false;
-            seen.add(name);
-            return true;
+                const name = item.name?.trim();
+                if (!name || seen.has(name)) return false;
+                seen.add(name);
+                return true;
             });
             console.log('Fetched POIs:', filtered);
             // const filtered = pois.filter(p => p.category === args.category).slice(0, 10);
