@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { toast } from "react-fox-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import ChatBox from "@/components/chat-box"
 
 // Dynamically import the Map component with no SSR
 const MapComponent = dynamic(() => import("@/components/map"), {
@@ -134,11 +135,13 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
   }, [])
 
   // Handle sending message to API
-  const handleSendMessage = async (message: string, location: any, radius:any) => {
+  const handleSendMessage = async (message: string, location: any, radius:any, voice = true) => {
     try {
       setIsLoading(true)
       setResponse("") // reset UI output
-
+      if (!voice) {
+        setMessages((prev) => [...prev, { role: "user", content: message }])
+      }
       const res = await fetch("/api/chat2", {
         method: "POST",
         headers: {
@@ -150,36 +153,6 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
       if (!res.ok || !res.body) {
         throw new Error("Failed to get response")
       }
-
-      // const decoder = new TextDecoder()
-      // const reader = res.body.getReader()
-
-      // let fullResponse = ""
-
-      // while (true) {
-      //   const { done, value } = await reader.read()
-      //   if (done) break
-
-      //   const chunk = decoder.decode(value, { stream: true })
-
-      //   // Split on newlines for NDJSON (one JSON object per line)
-      //   const lines = chunk.split("\n").filter((line) => line.trim() !== "")
-
-      //   for (const line of lines) {
-      //     try {
-      //       const json = JSON.parse(line)
-      //       const content = json?.choices?.[0]?.delta?.content
-      //       if (content) {
-      //         fullResponse += content
-      //         setResponse((prev) => prev + content) // LIVE update
-      //       }
-      //     } catch (err) {
-      //       console.error("Streaming JSON parse error:", err, line)
-      //     }
-      //   }
-      // }
-
-      // setMessages((prev) => [...prev, { role: "assistant", content: fullResponse }])
 
       const responseText = await res.json();
       setPoi(responseText.poi)
@@ -319,7 +292,7 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
                   msg.role === "user" ? "bg-blue-100 ml-auto" : "bg-gray-100 mr-auto",
                 )}
               >
-                {msg.content}
+                { msg.role === "user" ? msg.content : <pre className="text-wrap font-sans">{msg.content}</pre> }
               </div>
             ))}
 
@@ -346,7 +319,12 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
         </CardContent>
       </Card>
 
-      <div className="w-full max-w-2xl flex justify-center space-x-4">
+      {/* Chat Box Component */}
+      <div className="mt-4 w-full max-w-2xl">
+        <ChatBox onSendMessage={(message) => handleSendMessage(message, locationRef.current, radiusRef.current, false)} />
+      </div>
+
+      <div className="w-full max-w-2xl flex justify-center space-x-4 mt-6">
         <Button
           onClick={toggleListening}
           className={cn(

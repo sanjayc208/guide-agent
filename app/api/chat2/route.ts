@@ -99,7 +99,14 @@ Rules:
         // If the model invoked our tool
         if (toolCall?.function.name === 'getNearbyPOIs') {
             const args = JSON.parse(toolCall.function.arguments || '{}');
-            const filtered: POI[] = await fetchNearbyPOIs(lat, lon, radius, args.category);
+            let filtered: POI[] = await fetchNearbyPOIs(lat, lon, radius, args.category);
+            const seen = new Set();
+            filtered = filtered.filter(item => {
+            const name = item.name?.trim();
+            if (!name || seen.has(name)) return false;
+            seen.add(name);
+            return true;
+            });
             console.log('Fetched POIs:', filtered);
             // const filtered = pois.filter(p => p.category === args.category).slice(0, 10);
             // console.log('Filtered POIs:', filtered);
@@ -109,10 +116,14 @@ You are a friendly AI Agent that recommends ${args.category}places nearby.
 You will be given a list of ${args.category} places in JSON format.
 You cannot give details or directions or address about the places but only the name and distance from the user location.
 If no places are found, say so politely but also tell the user that would like to search for specific places like restaurant, cafe, pub, fast food, museum, park.
+Also mention the no of places found in the list.
 
 Include the distance in meters from the user location which is currently set to ${lat}, ${lon} and to the list of each object has lat: and lon: as key calculate and mention it in meters or Killometers.
 Never read lattitude and longitude or any unecessary information from the JSON. this is just for user who want to know places nearby.
-Dont include ** or * the response is for voice conversation.`;
+Dont include ** or * the response is for voice conversation.
+
+- Remove duplicate name or empty name from the list and sort the list by distance.
+- Give the list in pointer format.`;
 
             const toolPrompt = `
 Here is the list of ${args.category} places:
