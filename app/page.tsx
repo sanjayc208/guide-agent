@@ -45,8 +45,7 @@ export default function LondonTravelGuide() {
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const [response, setResponse] = useState("")
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: `Hey there! 👋 I'm your friendly AI Agent, ready to explore the neighborhood with you! ☕🍔🏥
-Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask, and I’ll find the best spots within 1 km of where you are. Let’s discover what’s around you! 🌍✨` },
+    { role: "assistant", content: `✨ Instantly discover what's around you 🗣️ Just speak or 📝 type to begin!` },
   ])
   const [isLoading, setIsLoading] = useState(false)
   const [location, setLocation] = useState<any>(null)
@@ -263,100 +262,103 @@ Looking for a cozy café, a tasty restaurant, or the nearest hospital? Just ask,
           </SelectContent>
         </Select>
       </div>
-
-      {/* Map Component */}
-      <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
-        <CardContent className="p-4">
-          <div className="h-[300px] rounded-lg overflow-hidden">
-            <MapComponent onLocationChange={handleLocationChange} radius={Number(radius)} poi={poi}/>
-          </div>
-          {location && (
-            <div className="mt-2 text-sm flex items-center text-gray-600">
-              <MapPin className="w-4 h-4 mr-1" />
-              <span>
-                {location.city}, {location.state}, {location.country}
-              </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full lg:max-w-[90%]">
+        {/* Map Component */}
+        <Card className="bg-white shadow-lg">
+          <CardContent className="p-4">
+            <div className="h-[55vh] rounded-lg overflow-hidden">
+              <MapComponent onLocationChange={handleLocationChange} radius={Number(radius)} poi={poi} />
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="w-full max-w-2xl mb-6 bg-white shadow-lg">
-        <CardContent className="p-4">
-          <div className="space-y-4 max-h-[50vh] overflow-y-auto">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "p-3 rounded-lg max-w-[80%] text-black",
-                  msg.role === "user" ? "bg-blue-100 ml-auto" : "bg-gray-100 mr-auto",
-                )}
-              >
-                { msg.role === "user" ? msg.content : <pre className="text-wrap font-sans">{msg.content}</pre> }
-              </div>
-            ))}
-
-            {isLoading && (
-              <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto">
-                <div className="flex space-x-2">
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  ></div>
-                </div>
+            {location && (
+              <div className="mt-2 text-sm flex items-center text-gray-600">
+                <MapPin className="w-4 h-4 mr-1" />
+                <span>
+                  {location.city}, {location.state}, {location.country}
+                </span>
               </div>
             )}
-            <div ref={bottomRef} />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Chat Box Component */}
-      <div className="mt-4 w-full max-w-2xl">
-        <ChatBox onSendMessage={(message) => handleSendMessage(message, locationRef.current, radiusRef.current, false)} />
+        {/* Messages Component */}
+        <Card className="bg-white shadow-lg">
+          <CardContent className="p-4">
+            <div className="space-y-4 min-h-[55vh] max-h-[55vh] overflow-y-auto">
+              {messages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "p-3 rounded-lg max-w-[80%] text-black",
+                    msg.role === "user" ? "bg-blue-100 ml-auto" : "bg-gray-100 mr-auto",
+                  )}
+                >
+                  {msg.role === "user" ? msg.content : <pre className="text-wrap font-sans">{msg.content}</pre>}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="bg-gray-100 p-3 rounded-lg max-w-[80%] mr-auto">
+                  <div className="flex space-x-2">
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+            {/* Chat Box Component */}
+            <div className="mt-4 w-full flex items-center space-x-2">
+              <ChatBox onSendMessage={(message) => handleSendMessage(message, locationRef.current, radiusRef.current, false)} />
+              <div className="flex space-x-2">
+                <Button
+                  onClick={toggleListening}
+                  className={cn(
+                    "rounded-full w-12 h-12 flex items-center justify-center",
+                    isListening ? "bg-red-500 hover:bg-red-600" : "bg-primary",
+                  )}
+                  disabled={isLoading}
+                >
+                  {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                </Button>
+
+                <Button
+                  onClick={toggleSpeech}
+                  className={cn(
+                    "rounded-full w-12 h-12 flex items-center justify-center",
+                    isSpeaking ? "bg-red-500 hover:bg-red-600" : "bg-primary",
+                  )}
+                  disabled={!response || isLoading}
+                >
+                  {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
       </div>
 
-      <div className="w-full max-w-2xl flex justify-center space-x-4 mt-6">
-        <Button
-          onClick={toggleListening}
-          className={cn(
-            "rounded-full w-16 h-16 flex items-center justify-center",
-            isListening ? "bg-red-500 hover:bg-red-600" : "bg-primary",
-          )}
-          disabled={isLoading}
-        >
-          {isListening ? <MicOff size={24} /> : <Mic size={24} />}
-        </Button>
-
-        <Button
-          onClick={toggleSpeech}
-          className={cn(
-            "rounded-full w-16 h-16 flex items-center justify-center",
-            isSpeaking ? "bg-red-500 hover:bg-red-600" : "bg-primary",
-          )}
-          disabled={!response || isLoading}
-        >
-          {isSpeaking ? <VolumeX size={24} /> : <Volume2 size={24} />}
-        </Button>
-      </div>
+      
 
       <div className="mt-6 text-center text-sm text-gray-500">
-        {isListening ? (
-          <p className="animate-pulse">Listening...</p>
-        ) : isSpeaking ? (
-          <p>Speaking...</p>
-        ) : (
-          <p>Press the microphone button to ask a question</p>
-        )}
-      </div>
+              {isListening ? (
+                <p className="animate-pulse">Listening...</p>
+              ) : isSpeaking ? (
+                <p>Speaking...</p>
+              ) : (
+                <p>Press the microphone button to ask a question</p>
+              )}
+            </div>
     </div>
   )
 }

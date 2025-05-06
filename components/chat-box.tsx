@@ -20,7 +20,7 @@ export default function ChatBox({ onSendMessage }: { onSendMessage: (message: st
   };
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex w-full items-center space-x-2">
       <Input
         type="text"
         placeholder="Type your message..."
