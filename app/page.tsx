@@ -157,11 +157,13 @@ export default function LondonTravelGuide() {
       setPoi(responseText.poi)
       setMessages((prev) => [...prev, { role: "assistant", content: responseText.content }])
       speakText(responseText.content)
+      setResponse(responseText.content)
     } catch (err) {
       console.error("Error during stream:", err)
       const errorMessage = "Oops! Something went wrong. Try again."
       setMessages((prev) => [...prev, { role: "assistant", content: errorMessage }])
       speakText(errorMessage)
+      setResponse(errorMessage)
     } finally {
       setIsLoading(false)
     }

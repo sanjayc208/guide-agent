@@ -20,7 +20,7 @@ export async function fetchNearbyPOIs(
       (
         node(around:${radius},${lat},${lon})[amenity=${category}];
       );
-      out body;
+      out body 25;
     `;
 
     console.log("Overpass query:", q);
