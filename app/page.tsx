@@ -61,7 +61,6 @@ export default function LondonTravelGuide() {
 
   // Add a ref to store the latest location
   const latLong = useRef<any>({ lat: 0, lng: 0 })
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, response])
@@ -248,7 +247,7 @@ export default function LondonTravelGuide() {
       </header>
 
       {/* Dropdown for radius selection */}
-      <div className="mb-4">
+      <div className="mb-4 flex items-center">
         <Select value={radius.toString()} onValueChange={(value) => setRadius(Number(value))}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Select Radius" />
