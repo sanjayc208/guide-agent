@@ -76,7 +76,7 @@ export default function MapComponent({ onLocationChange, radius = 1000, poi = []
     clearExistingRoute()
 
     poi.forEach(p => {
-      if (!p.name || !p.category) return
+      if (!p.name || !p.category) return;
       const redIcon = L.icon({
         iconUrl: 'https://www.svgrepo.com/show/476893/marker.svg',
         iconSize: [25, 41],
@@ -84,10 +84,20 @@ export default function MapComponent({ onLocationChange, radius = 1000, poi = []
         popupAnchor: [1, -34],
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
         shadowSize: [41, 41]
-      })
+      });
 
-      const marker = L.marker([p.lat, p.lon], { icon: redIcon }).addTo(mapRef.current!)
-      marker.bindPopup(`<b>${p.name}</b><br>${p.category}`)
+      const marker = L.marker([p.lat, p.lon], { icon: redIcon }).addTo(mapRef.current!);
+      marker.bindPopup(`<b>${p.name}</b><br>${p.category}`);
+      // marker.bindTooltip(`<b>${p.name}</b><br>${p.category}`);
+
+      // Add hover event to show name and category
+      marker.on('mouseover', () => {
+        marker.openPopup();
+      });
+
+      marker.on('mouseout', () => {
+        marker.closePopup();
+      });
 
       marker.on('click', e => {
         L.DomEvent.stopPropagation(e)
@@ -111,10 +121,10 @@ export default function MapComponent({ onLocationChange, radius = 1000, poi = []
           lastDestRef.current = destLatLng
           setIsRouteAvailable(true); // Update local state
         }
-      })
+      });
 
-      markersRef.current.push(marker)
-    })
+      markersRef.current.push(marker);
+    });
   }, [poi])
 
   useEffect(() => {

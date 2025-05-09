@@ -18,7 +18,7 @@ export async function fetchNearbyPOIs(
     const q = `
       [out:json][timeout:25];
       (
-        node(around:${radius},${lat},${lon})[amenity=${category}];
+        node(around:${radius},${lat},${lon})[${category}];
       );
       out body 25;
     `;
