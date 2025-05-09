@@ -252,7 +252,7 @@ export default function LondonTravelGuide() {
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Select Radius" />
           </SelectTrigger>
-          <SelectContent className="absolute z-[500]">
+          <SelectContent className="absolute z-[1000]">
             <SelectItem value="100">100m</SelectItem>
             <SelectItem value="200">200m</SelectItem>
             <SelectItem value="500">500m</SelectItem>
